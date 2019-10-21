@@ -290,12 +290,6 @@ export class HsDevService {
             onNotify: (notify) => {},
             onResult: (result: any[]) => {
                 this.sendAllDocumentsDiagnostics(this.connection, result);
-                let diags = result.map(r => new HsDevDiagnostic(
-                    r.source.file,
-                    r.region.from.line, r.region.from.column,
-                    r.note.message,
-                    Math.max(r.level - 1, 0)
-                ));
             }
         });
     }
