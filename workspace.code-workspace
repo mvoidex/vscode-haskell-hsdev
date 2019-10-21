@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "C:\\Users\\voide\\Documents\\Projects\\hsdev"
+		},
+		{
+			"path": "C:\\Users\\voide\\AppData\\Roaming\\Sublime Text 3\\Packages\\SublimeHaskell"
+		},
+		{
+			"path": "C:\\Users\\voide\\.atom\\packages\\atom-haskell-hsdev"
+		}
+	],
+	"settings": {
+		"typescript.tsc.autoDetect": "off"
+	}
+}

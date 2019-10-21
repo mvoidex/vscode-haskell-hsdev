@@ -1,0 +1,28 @@
+{
+  "name": "haskell-hsdev-language-server",
+  "description": "Language server for haskell using hsdev as a backend",
+  "version": "0.0.1",
+  "author": "Alexandr Ruchkin",
+  "license": "MIT",
+  "engines": {
+    "node": "*"
+  },
+  "dependencies": {
+    "@types/vscode": "^1.39.0",
+    "child_process": "^1.0.2",
+    "fs": "0.0.2",
+    "node-uuid": "^1.4.8",
+    "tmp": "0.1.0",
+    "tslint": "^5.20.0",
+    "vscode-languageserver": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^12.11.1",
+    "@types/tmp": "0.1.0",
+    "typescript": "^3.6.4"
+  },
+  "scripts": {
+    "compile": "installServerIntoExtension ../client ./package.json ./tsconfig.json && tsc -p .",
+    "watch": "installServerIntoExtension ../client ./package.json ./tsconfig.json && tsc --watch -p ."
+  }
+}
