@@ -12,7 +12,7 @@ import { Log } from './debug/debugUtils';
  */
 export class CompletionUtils {
 
-    private static toCompletionType(kind: SymbolType) {
+    public static toCompletionType(kind: SymbolType): vsrv.CompletionItemKind {
         switch (kind) {
             case SymbolType.Function: return vsrv.CompletionItemKind.Function;
             case SymbolType.Method: return vsrv.CompletionItemKind.Function;

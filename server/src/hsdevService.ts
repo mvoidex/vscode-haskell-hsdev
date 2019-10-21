@@ -13,11 +13,12 @@ import { DebugUtils, Log, LogLevel } from './debug/debugUtils';
 import { Features } from './features/features';
 import { CompletionUtils } from './completionUtils';
 import { HsDevSettings, settingsUpdated } from './hsdevSettings';
-import { HsDevCommand, TypeInfoKind, Ping, Whoat, Exit, Scan, ProjectTarget, BuildTool, FileTarget, Complete, InferTypes, FindUsages, CheckLint } from "./hsdev/commands/commands";
+import { HsDevCommand, TypeInfoKind, Ping, Whoat, Exit, Scan, ProjectTarget, BuildTool, FileTarget, Complete, InferTypes, FindUsages, CheckLint, InfoSymbol, SearchQuery, TargetSourceType, TargetType, Link } from "./hsdev/commands/commands";
 import { HsDevServer } from './hsdev/hsdevServer';
 import { HsDevClient } from './hsdev/hsdevClient';
-import { Symbol, SymbolId, SymbolType, FileLocation } from './hsdev/syntaxTypes';
+import { Symbol, SymbolId, SymbolType, FileLocation, Region } from './hsdev/syntaxTypes';
 import { uriToFilePath } from 'vscode-languageserver/lib/files';
+import { Disposable } from 'vscode-languageserver';
 
 const serverCapabilities: vsrv.InitializeResult = {
     capabilities: {
@@ -34,13 +35,14 @@ const serverCapabilities: vsrv.InitializeResult = {
         //     // doesn't support completion details
         //     resolveProvider: true
         // }
+        // documentSymbolProvider: true
     }
 };
 
 /**
  * Exposes all haskell-hsdev capabilities to the server
  */
-export class HsDevService {
+export class HsDevService implements Disposable {
     private hsdevServer: HsDevServer;
     private hsdevClient: HsDevClient;
     private connection: vsrv.IConnection;
@@ -64,11 +66,14 @@ export class HsDevService {
 
         this.hsdevServer.on('start', () => { Log.info('hsdev server started'); });
         this.hsdevServer.on('stop', () => { Log.info('hsdev server stopped'); });
-        this.hsdevClient.on('connect', () => { Log.info('hsdev client connected'); });
+        this.hsdevClient.on('connect', () => {
+            Log.info('hsdev client connected');
+            this.hsdevClient.invoke(new Link()); // force process exit on disconnect
+        });
         this.hsdevClient.on('disconnect', () => { Log.info('hsdev client disconnected'); });
 
         try {
-            await this.startHsDevAndHandleErrors(targets);
+            await this.startHsDev(targets);
 
             //server capabilities are sent later with a client/registerCapability request (just send the document sync capability here)
             //see onInitialized method
@@ -81,6 +86,13 @@ export class HsDevService {
         }
     }
 
+    public shutdown() {
+        Log.info(`Stopping haskell hsdev`);
+        this.stopHsDev();
+    }
+
+    public dispose() { this.shutdown(); }
+
     public onInitialized() {
         if (this.initializationOk) {
             this.features.registerAllFeatures();
@@ -92,7 +104,7 @@ export class HsDevService {
         }
     }
 
-    private async startHsDevAndHandleErrors(targets: string[]): Promise<void> {
+    private async startHsDev(targets: string[]): Promise<void> {
         // Launch the hsdev process
         try {
             await this.hsdevServer.start();
@@ -105,6 +117,20 @@ export class HsDevService {
                 retry: false,
                 data: { retry: false }
             });
+        }
+    }
+
+
+    private async stopHsDev(): Promise<void> {
+        if (this.hsdevClient) {
+            Log.debug(`disconnection hsdev client`);
+            this.hsdevClient.dispose();
+            this.hsdevClient = undefined;
+        }
+        if (this.hsdevServer) {
+            Log.debug(`stopping hsdev server`);
+            this.hsdevServer.dispose();
+            this.hsdevServer = undefined;
         }
     }
 
@@ -138,7 +164,7 @@ export class HsDevService {
 
         this.connection.console.log('Restarting hsdev with targets: ' + prettyString(targets));
         try {
-            await this.startHsDevAndHandleErrors(targets);
+            await this.startHsDev(targets);
             Log.info(`Restart done.`);
             this.features.registerAllFeatures();
             this.currentTargets = targets;
@@ -191,6 +217,59 @@ export class HsDevService {
         return null;
     }
 
+    public async getModuleDefinitions(textDocument: vsrv.TextDocument): Promise<vsrv.SymbolInformation[]> {
+        Log.debug("get definitions: " + uriToFilePath(textDocument.uri));
+
+        if (!this.hsdevClient || !this.hsdevClient.isConnected) {
+            return null;
+        }
+        let file = UriUtils.toFilePath(textDocument.uri);
+        // Just to be in sure with currently ongoing scan
+        await this.hsdevClient.invoke(new Scan(new FileTarget(file, BuildTool.Stack, false, false)), {
+            onError: (error, details?) => { Log.error(`error inspecting file ${file}: ${details}`); },
+            onNotify: (notify) => {},
+            onResult: () => { Log.info(`file ${file} inspected`); }
+        });
+        let cmd = new InfoSymbol(new SearchQuery(), [{target: TargetType.File, name: UriUtils.toFilePath(textDocument.uri)}], false);
+        let syms = await this.hsdevClient.invoke(cmd).catch<null>(e => {
+            Log.error(`error listing file definitions: ${e}`);
+            return null;
+        }) as Symbol[];
+        if (syms) {
+            return syms.map(sym => {
+                return {
+                    name: sym.name,
+                    kind: CompletionUtils.toCompletionType(sym.symbolType),
+                    location: DocumentUtils.toLocation(sym.module.location as FileLocation, Region.createWord(sym.position, sym.name.length))
+                };
+            });
+        }
+        return [];
+    }
+
+    public async getDefinitions(): Promise<vsrv.SymbolInformation[]> {
+        Log.debug("get all definitions");
+
+        if (!this.hsdevClient || !this.hsdevClient.isConnected) {
+            return null;
+        }
+        let cmd = new InfoSymbol(new SearchQuery(), [TargetSourceType.Sourced], false);
+        let syms = await this.hsdevClient.invoke(cmd).catch<null>(e => {
+            Log.error(`error listing all definitions: ${e}`);
+            return null;
+        }) as Symbol[];
+        if (syms) {
+            return syms.map(sym => {
+                return {
+                    name: sym.name,
+                    kind: CompletionUtils.toCompletionType(sym.symbolType),
+                    location: DocumentUtils.toLocation(sym.module.location as FileLocation, Region.createWord(sym.position, sym.name.length))
+                };
+            });
+        }
+        return [];
+    }
+
     public async getHoveredSymbol(textDocument: vsrv.TextDocument, position: vsrv.Position, infoKind: TypeInfoKind): Promise<Symbol> {
         if (!this.hsdevClient || !this.hsdevClient.isConnected) {
             return null;
@@ -199,8 +278,9 @@ export class HsDevService {
         let wordRange = DocumentUtils.getIdentifierAtPosition(textDocument, position, NoMatchAtCursorBehaviour.Stop);
         if (!wordRange.isEmpty) {
             let cmd = new Whoat(wordRange.range.start.line + 1, wordRange.range.start.character + 1, UriUtils.toFilePath(textDocument.uri));
-            let syms = await this.hsdevClient.invoke(cmd).catch(e => {
+            let syms = await this.hsdevClient.invoke(cmd).catch<null>(e => {
                 Log.error(`invoking 'whoat' fails with: ${e}`);
+                return null;
             });
             if (syms && syms.length > 0) {
                 return syms.shift();
@@ -269,7 +349,7 @@ export class HsDevService {
     }
 
     public async validateTextDocument(connection: vsrv.IConnection, textDocument: vsrv.TextDocumentIdentifier): Promise<void> {
-        DebugUtils.instance.connectionLog("validate : " + uriToFilePath(textDocument.uri));
+        Log.debug("validate : " + uriToFilePath(textDocument.uri));
 
         if (!this.hsdevClient || !this.hsdevClient.isConnected) {
             return;

@@ -31,6 +31,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(hsdevClient);
 }
 
+
 /**
  * Returns value if value is not null or undefined, otherwise returns defaultValue
 */

@@ -1,6 +1,7 @@
 import * as vsrv from 'vscode-languageserver';
 import * as uuid from 'node-uuid';
 import { CommandsService } from "../commands/commandsService";
+import { Log } from '../debug/debugUtils';
 
 /**
  * Manage features activation with the language client
@@ -19,6 +20,10 @@ export class Features {
         {
             id: uuid.v4(),
             method: "textDocument/definition"
+        },
+        {
+            id: uuid.v4(),
+            method: "textDocument/documentSymbol"
         },
         {
             id: uuid.v4(),
@@ -45,6 +50,10 @@ export class Features {
             registerOptions: {
                 commands: CommandsService.toFeaturesCommands()
             }
+        },
+        {
+            id: uuid.v4(),
+            method: "workspace/symbol"
         }
     ];
 
@@ -59,6 +68,7 @@ export class Features {
      */
     public registerAllFeatures() {
         if (this.areFeaturesRegistered) {
+            Log.debug(`features already registered`);
             return;
         }
         let registrationParams: vsrv.RegistrationParams = {
@@ -67,29 +77,32 @@ export class Features {
 
         this.connection.sendRequest(vsrv.RegistrationRequest.type, registrationParams)
             .then(() => {
+                Log.debug(`features registered`);
                 this.areFeaturesRegistered = true;
             }, error => {
+                Log.error(`error registering features: ${error}`);
                 this.areFeaturesRegistered = false;
-                console.log("error for registration request: " + error);
             });
-    }
-
+        }
+        
     /**
      * Disable all features on the client
      */
     public unregisterAllFeatures() {
         if (!this.areFeaturesRegistered) {
+            Log.debug(`features already unregistered`);
             return;
         }
         let unregistrationParams: vsrv.UnregistrationParams = {
             unregisterations: Features.features
         };
         this.connection.sendRequest(vsrv.UnregistrationRequest.type, unregistrationParams)
-            .then(() => {
-                this.areFeaturesRegistered = false;
-            }, error => {
-                this.areFeaturesRegistered = true;
-                console.log("error for unregistration request: " + error);
-            });
+        .then(() => {
+            Log.debug(`features registered`);
+            this.areFeaturesRegistered = false;
+        }, error => {
+            Log.error(`error unregistering features: ${error}`);
+            this.areFeaturesRegistered = true;
+        });
     }
 }

@@ -5,9 +5,10 @@ import { HsDevCommand } from './commands/commands';
 import { HsDevResponse } from './commands/hsdevResponse';
 
 import * as net from 'net';
+import { Disposable } from 'vscode-jsonrpc';
 
 
-class SocketReader {
+class SocketReader implements Disposable {
     private onLine: (line: string) => void = (line) => {};
     private onClose: () => void = () => {};
 
@@ -16,6 +17,11 @@ class SocketReader {
     ) {
         sock.on('data', this.onData);
         sock.on('close', this.onClose);
+    }
+    
+    public dispose() {
+        this.sock.off('data', this.onData);
+        this.sock.off('close', this.onClose);
     }
 
     public on(event: 'line', cb: (line: string) => void): this;
@@ -90,7 +96,7 @@ export interface QueryFilters {
 }
 
 
-export class HsDevClient {
+export class HsDevClient implements Disposable {
     private sock: net.Socket;
     private sockReader: SocketReader;
     private onConnect: () => void = () => {};
@@ -108,6 +114,10 @@ export class HsDevClient {
     public constructor(
         private options: ClientOptions = {}
     ) {}
+
+    public dispose() {
+        this.disconnect();
+    }
 
     public on(event: 'connect', cb: () => void): this;
     public on(event: 'disconnect', cb: () => void): this;
@@ -135,6 +145,7 @@ export class HsDevClient {
             Log.debug(`hsdev client already connected or connecting`);
             return;
         }
+        Log.debug(`connecting hsdev client`);
         this.sock = new net.Socket();
         this.sock.setEncoding('utf-8');
 
@@ -173,6 +184,7 @@ export class HsDevClient {
             Log.debug(`hsdev client already disconnected or disconnecting`);
             return;
         }
+        Log.debug(`disconnecting hsdev client`);
         this.sock.end();
     }
 
@@ -292,6 +304,7 @@ export class HsDevClient {
     private clear() {
         this.isConnected = false;
         this.sock = null;
+        this.sockReader.dispose();
         this.sockReader = null;
         this.id = 0;
     }

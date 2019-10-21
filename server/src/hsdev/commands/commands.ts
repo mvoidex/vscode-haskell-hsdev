@@ -389,6 +389,12 @@ export class CheckLint implements HsDevCommand<any[]> {
     public parseResponse = (value: any) => success(value as any[]);
 }
 
+export class Link implements HsDevCommand<void> {
+    public command = "link";
+    public serialize(): any { return {}; }
+    public parseResponse = ignore;
+}
+
 export class Exit implements HsDevCommand<void> {
     public command = "exit";
     public serialize(): any { return {}; }

@@ -10,6 +10,8 @@ import { TypeInfoKind } from './hsdev/commands/commands';
 import { CommandsService } from "./commands/commandsService";
 import { Symbol } from './hsdev/syntaxTypes';
 import * as features from "./features";
+import { HsDevServer } from './hsdev/hsdevServer';
+import { HsDevClient } from './hsdev/hsdevClient';
 
 // Create a connection for the server. The connection uses Node's IPC as a transport
 let connection: vsrv.IConnection = vsrv.createConnection(new vsrv.IPCMessageReader(process), new vsrv.IPCMessageWriter(process));
@@ -32,6 +34,20 @@ connection.onInitialize((params): Promise<vsrv.InitializeResult> => {
     Log.trace('onInitialize');
     workspaceRoot = params.rootPath;
     return hsdevService.initialize(connection, params.initializationOptions.settings, params.initializationOptions.targets);
+});
+
+connection.onShutdown(() => {
+    if (hsdevService) {
+        hsdevService.dispose();
+        hsdevService = null;
+    }
+});
+
+connection.onExit(() => {
+    if (hsdevService) {
+        hsdevService.dispose();
+        hsdevService = null;
+    }
 });
 
 connection.onRequest("changeTargets", (targets: string[]): Promise<string> => {
@@ -90,6 +106,18 @@ connection.onDefinition((documentInfo): Promise<vsrv.Location> => {
         const textDocument = documents.get(documentURI);
         return hsdevService.getDefinitionLocation(textDocument, documentInfo.position);
     }
+});
+
+connection.onDocumentSymbol((documentInfo): Promise<vsrv.SymbolInformation[]> => {
+    const documentURI = documentInfo.textDocument.uri;
+    if (UriUtils.isFileProtocol(documentURI)) {
+        const textDocument = documents.get(documentURI);
+        return hsdevService.getModuleDefinitions(textDocument);
+    }
+});
+
+connection.onWorkspaceSymbol((workspaceInfo): Promise<vsrv.SymbolInformation[]> => {
+    return hsdevService.getDefinitions();
 });
 
 connection.onHover((documentInfo): Promise<vsrv.Hover> => {

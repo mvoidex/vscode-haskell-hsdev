@@ -3,9 +3,13 @@ import { Log, LogLevel, wrapCallback } from '../debug/debugUtils';
 import child_process = require('child_process');
 import stream = require('stream');
 import os = require('os');
+import { Disposable } from 'vscode-jsonrpc';
+import treeKill = require('tree-kill');
+import { SIGQUIT } from 'constants';
+// import { treeKill } from 'tree-kill/index';
 
 
-class StreamReader {
+class StreamReader implements Disposable {
     private onLine: (line: string) => void = (line) => {};
     private onClose: () => void = () => {};
 
@@ -15,6 +19,12 @@ class StreamReader {
         handle.on('data', this.onData);
         handle.on('end', this.onClose);
         handle.on('close', this.onClose);
+    }
+
+    public dispose() {
+        this.handle.off('data', this.onData);
+        this.handle.off('end', this.onClose);
+        this.handle.off('close', this.onClose);
     }
 
     public on(event: 'line', cb: (line: string) => void): this;
@@ -52,7 +62,7 @@ export interface ServerOptions {
 }
 
 
-export class HsDevServer {
+export class HsDevServer implements Disposable {
     private stdoutReader: StreamReader;
     private stderrReader: StreamReader;
     private proc: child_process.ChildProcess;
@@ -67,6 +77,10 @@ export class HsDevServer {
         private cmd: string[],
         private options: ServerOptions = {}
     ) {}
+
+    public dispose() {
+        this.stop();
+    }
 
     public on(event: 'start', cb: () => void): this;
     public on(event: 'stop', cb: () => void): this;
@@ -102,7 +116,7 @@ export class HsDevServer {
 
         let command = args.shift();
         Log.debug(`Spawning hsdev process: ${command} ${args}`);
-        this.proc = child_process.spawn(command, args);
+        this.proc = child_process.spawn(command, args, {stdio: 'pipe'});
 
         this.proc.stdout.setEncoding('utf-8');
         this.proc.stderr.setEncoding('utf-8');
@@ -145,15 +159,35 @@ export class HsDevServer {
             Log.debug(`hsdev server already stopped or stopping`);
             return;
         }
+        
+        // FIXME: Still don't work...
+        Log.debug(`stopping hsdev server process`);
+        let args: string[] = [...this.cmd];
+        args.push('stop');
+        if (this.options.port) {
+            args.push('--port', this.options.port.toString());
+        }
+        let command = args.shift();
+        setTimeout(() => {
+            Log.debug(`spawning process to send stop command: ${command}, ${args}`);
+            let stop = child_process.spawn(command, args, {stdio: 'pipe'});
+            stop.stdin.end();
+            stop.on('exit', (code, signal) => {
+                Log.debug(`stopper exited with code ${code} and signal ${signal}`);
+            });
+        }, 0);
 
         this.proc.stdin.end();
-        this.proc.kill();
+        treeKill(this.proc.pid, SIGQUIT);
+        // treeKill(this.proc.pid);
     }
 
     private clear() {
         this.isAlive = false;
         this.proc = null;
+        this.stdoutReader.dispose();
         this.stdoutReader = null;
+        this.stderrReader.dispose();
         this.stderrReader = null;
     }
 

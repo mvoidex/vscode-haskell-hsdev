@@ -13,6 +13,7 @@
     "fs": "0.0.2",
     "node-uuid": "^1.4.8",
     "tmp": "0.1.0",
+    "tree-kill": "^1.2.1",
     "tslint": "^5.20.0",
     "vscode-languageserver": "^5.2.1"
   },

@@ -306,6 +306,11 @@ export class Region implements Region {
         public end: Position
     ) {}
 
+    public static createWord(start: Position, length: number): Region {
+        let end = new Position(start.line, start.column + length);
+        return new Region(start, end);
+    }
+
     public toString(): string {
         return `${this.start}-${this.end}`;
     }

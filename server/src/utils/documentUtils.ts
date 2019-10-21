@@ -1,9 +1,12 @@
 'use strict';
 
 import { TextDocument, Position, Range } from 'vscode-languageserver';
+import * as vsrv from 'vscode-languageserver';
 import { HsDevRange } from '../hsdev/hsdevRange';
 import * as fs from 'fs';
 import { UriUtils } from "./uriUtils";
+import * as syntax from '../hsdev/syntaxTypes';
+import { CompletionUtils } from 'src/completionUtils';
 
 /**
  * Word at a known position (Range) in the document
@@ -71,6 +74,21 @@ export class DocumentUtils {
         else {
             return cursorOffset;
         }
+    }
+
+    public static toPosition(pos: syntax.Position): vsrv.Position {
+        return vsrv.Position.create(pos.line - 1, pos.column - 1);
+    }
+
+    public static toRange(rgn: syntax.Region): vsrv.Range {
+        return vsrv.Range.create(
+            DocumentUtils.toPosition(rgn.start),
+            DocumentUtils.toPosition(rgn.end)
+        );
+    }
+
+    public static toLocation(loc: syntax.FileLocation, rgn: syntax.Region): vsrv.Location {
+        return vsrv.Location.create(UriUtils.toUri(loc.filename), DocumentUtils.toRange(rgn));
     }
 
     /**
