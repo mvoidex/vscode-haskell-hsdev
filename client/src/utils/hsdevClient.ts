@@ -29,7 +29,6 @@ export interface ServerOptions {
 export interface HsDevSettings {
     clientOptions?: ClientOptions;
     serverOptions?: ServerOptions;
-    maxAutocompletionDetails: number;
     stackPath: string;
 }
 
@@ -90,7 +89,7 @@ export class HsDevClient implements vscode.Disposable {
 
     public start(initOptions: HsDevClientInitOptions): vscode.Disposable {
         HsDevClient.initOptions = initOptions;
-        this._client = new vscli.LanguageClient('HaskellHsDev', 'HaskellHsDev', this.serverOptions, this.clientOptions, this.debug);
+        this._client = new vscli.LanguageClient('haskell-hsdev', 'haskell-hsdev', this.serverOptions, this.clientOptions, this.debug);
         this.disposable = this._client.start();
         return this;
     }

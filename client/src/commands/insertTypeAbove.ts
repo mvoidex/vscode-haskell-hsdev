@@ -38,14 +38,12 @@ export class InsertTypeAbove {
         client
             .sendRequest("insertTypeAbove", hoverParams)
             .then(
-                (hover: unknown) => {
-                    if (!hover) {
+                (hovered: any) => {
+                    if (!hovered) {
                         return;
                     }
-                    let hover_ = hover as vssrv.Hover;
-                    //if the response contains a value field
-                    if (hover_ && this.isValued(hover_.contents) && hover_.contents.value !== "") {
-                        let signature = hover_.contents.value;
+                    if (hovered && hovered.functionType) {
+                        let signature = `${hovered.name} :: ${hovered.functionType}`;
                         editor.edit(this.addSignatureEditBuilder(editor, this.normalizeSignature(signature)));
                     }
                 },

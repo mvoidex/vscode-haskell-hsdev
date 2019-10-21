@@ -6,7 +6,6 @@ import * as tmp from 'tmp';
 import * as fs from 'fs';
 import * as net from 'net';
 
-import child_process = require('child_process');
 import { HsDevDiagnostic, HsDevDiagnosticKind } from './hsdev/commands/hsdevDiagnostic';
 import { DocumentUtils, WordSpot, NoMatchAtCursorBehaviour } from './utils/documentUtils';
 import { UriUtils } from './utils/uriUtils';
@@ -14,15 +13,11 @@ import { DebugUtils, Log, LogLevel } from './debug/debugUtils';
 import { Features } from './features/features';
 import { CompletionUtils } from './completionUtils';
 import { HsDevSettings, settingsUpdated } from './hsdevSettings';
-import { HsDevCommand, TypeInfoKind, Ping, Whoat, Exit, Scan, ProjectTarget, BuildTool, FileTarget, Complete, InferTypes, FindUsages } from "./hsdev/commands/commands";
-import { HsDevResponse } from "./hsdev/commands/hsdevResponse";
-import { NetworkInterfaceInfo } from 'os';
+import { HsDevCommand, TypeInfoKind, Ping, Whoat, Exit, Scan, ProjectTarget, BuildTool, FileTarget, Complete, InferTypes, FindUsages, CheckLint } from "./hsdev/commands/commands";
 import { HsDevServer } from './hsdev/hsdevServer';
 import { HsDevClient } from './hsdev/hsdevClient';
 import { Symbol, SymbolId, SymbolType, FileLocation } from './hsdev/syntaxTypes';
 import { uriToFilePath } from 'vscode-languageserver/lib/files';
-import { normalize } from 'path';
-import { Range } from 'vscode';
 
 const serverCapabilities: vsrv.InitializeResult = {
     capabilities: {
@@ -60,8 +55,7 @@ export class HsDevService {
         Log.init(connection, LogLevel.TRACE);
         Log.info(`Initializing haskell hsdev`);
 
-        // this.hsdevServer = new HsDevServer(['stack', 'exec', '--', 'hsdev'], settings.serverOptions);
-        this.hsdevServer = new HsDevServer(['hsdev'], settings.serverOptions);
+        this.hsdevServer = new HsDevServer([settings.stackPath, 'exec', '--', 'hsdev'], settings.serverOptions);
         this.hsdevClient = new HsDevClient(settings.clientOptions);
         this.settings = settings;
         this.connection = connection;
@@ -133,9 +127,6 @@ export class HsDevService {
 
 
     public async changeTargets(targets: string[]): Promise<string> {
-        // It seems that we have to restart ghci to set new targets,
-        // would be nice if there were a ghci command for it.
-
         const prettyString = (ts) => {
             if (ts.length === 0) {
                 return "default targets";
@@ -160,7 +151,6 @@ export class HsDevService {
     }
 
     public async changeSettings(newSettings: HsDevSettings): Promise<string> {
-        //if ghci options have changed we need to restart hsdev
         if (settingsUpdated<HsDevSettings>(this.settings, newSettings)) {
             this.settings = newSettings;
             return await this.changeTargets(this.currentTargets);
@@ -199,16 +189,25 @@ export class HsDevService {
             }
         }
         return null;
-        // const locAtRequest = new LocAtRequest(textDocument.uri, DocumentUtils.toHsDevRange(wordRange.range), wordRange.word);
-        // let response = await locAtRequest.send(this.hsdevProxy);
-        // if (response.isOk) {
-        //     let fileUri = UriUtils.toUri(response.filePath);
-        //     let loc = vsrv.Location.create(fileUri, DocumentUtils.toVSCodeRange(response.range));
-        //     return loc;
-        // }
-        // else {
-        //     return null;
-        // }
+    }
+
+    public async getHoveredSymbol(textDocument: vsrv.TextDocument, position: vsrv.Position, infoKind: TypeInfoKind): Promise<Symbol> {
+        if (!this.hsdevClient || !this.hsdevClient.isConnected) {
+            return null;
+        }
+
+        let wordRange = DocumentUtils.getIdentifierAtPosition(textDocument, position, NoMatchAtCursorBehaviour.Stop);
+        if (!wordRange.isEmpty) {
+            let cmd = new Whoat(wordRange.range.start.line + 1, wordRange.range.start.character + 1, UriUtils.toFilePath(textDocument.uri));
+            let syms = await this.hsdevClient.invoke(cmd).catch(e => {
+                Log.error(`invoking 'whoat' fails with: ${e}`);
+            });
+            if (syms && syms.length > 0) {
+                return syms.shift();
+            }
+        } else {
+            return null;
+        }
     }
 
     public async getHoverInformation(textDocument: vsrv.TextDocument, position: vsrv.Position, infoKind: TypeInfoKind): Promise<vsrv.Hover> {
@@ -223,15 +222,7 @@ export class HsDevService {
                 Log.error(`invoking 'whoat' fails with: ${e}`);
             });
             if (syms && syms.length > 0) {
-                let sym = syms[0];
-                // let typeInfo: vsrv.MarkedString = { language: 'haskell', value: response.type };
-                // let hover: vsrv.Hover = { contents: typeInfo };
-                // if (typeInfo.value !== null && typeInfo.value !== "") {
-                //     return hover;
-                // }
-                // else {
-                //     return null;
-                // }
+                let sym = syms.shift();
                 let  symbolInfo: vsrv.MarkedString = { language: 'haskell', value: sym.detailed() };
                 let hover: vsrv.Hover = { contents: symbolInfo };
                 return hover;
@@ -239,12 +230,6 @@ export class HsDevService {
         } else {
             return null;
         }
-        //     const typeAtRequest = new TypeAtRequest(textDocument.uri, DocumentUtils.toHsDevRange(wordRange.range), wordRange.word, infoKind);
-        //     let response = await typeAtRequest.send(this.hsdevProxy);
-        // }
-        // else {
-        //     return null;
-        // }
     }
 
     public getCompletionItems(textDocument: vsrv.TextDocument, position: vsrv.Position): Promise<vsrv.CompletionItem[]> {
@@ -253,7 +238,7 @@ export class HsDevService {
             return CompletionUtils.getImportCompletionItems(this.hsdevClient, textDocument, position, currentLine);
         }
         else {
-            return CompletionUtils.getDefaultCompletionItems(this.hsdevClient, textDocument, position, this.settings.maxAutocompletionDetails);
+            return CompletionUtils.getDefaultCompletionItems(this.hsdevClient, textDocument, position);
         }
     }
 
@@ -281,17 +266,6 @@ export class HsDevService {
         } else {
             return null;
         }
-        // const usesRequest = new UsesRequest(textDocument.uri, DocumentUtils.toHsDevRange(wordRange.range), wordRange.word);
-        // let response = await usesRequest.send(this.hsdevProxy);
-        // if (response.isOk) {
-        //     return response.locations.map((hsdevLoc) => {
-        //         let fileUri = UriUtils.toUri(hsdevLoc.file);
-        //         return vsrv.Location.create(fileUri, DocumentUtils.toVSCodeRange(hsdevLoc.range));
-        //     });
-        // }
-        // else {
-        //     return null;
-        // }
     }
 
     public async validateTextDocument(connection: vsrv.IConnection, textDocument: vsrv.TextDocumentIdentifier): Promise<void> {
@@ -311,27 +285,25 @@ export class HsDevService {
             onNotify: (notify) => {},
             onResult: () => { Log.info(`inferred types for ${file}`); }
         });
-
-        //when a file is opened in diff mode in VSCode, its url is not a path on disk
-        // if (UriUtils.isFileProtocol(textDocument.uri)) {
-        //     const reloadRequest = new ReloadRequest(textDocument.uri);
-        //     DebugUtils.instance.connectionLog(textDocument.uri);
-
-        //     let response = await reloadRequest.send(this.hsdevProxy);
-        //     this.sendDocumentDiagnostics(connection, response.diagnostics.filter(d => {
-        //         return d.filePath.toLowerCase() === UriUtils.toFilePath(textDocument.uri).toLowerCase();
-        //     }), textDocument.uri);
-        //     return;
-        // }
-        // else {
-        //     return;
-        // }
+        this.hsdevClient.invoke(new CheckLint([UriUtils.toFilePath(textDocument.uri)]), {
+            onError: (error, details?) => { Log.error(`error checking for ${file}: ${details}`); },
+            onNotify: (notify) => {},
+            onResult: (result: any[]) => {
+                this.sendAllDocumentsDiagnostics(this.connection, result);
+                let diags = result.map(r => new HsDevDiagnostic(
+                    r.source.file,
+                    r.region.from.line, r.region.from.column,
+                    r.note.message,
+                    Math.max(r.level - 1, 0)
+                ));
+            }
+        });
     }
 
-    private sendAllDocumentsDiagnostics(connection: vsrv.IConnection, hsdevDiags: HsDevDiagnostic[]) {
+    private sendAllDocumentsDiagnostics(connection: vsrv.IConnection, hsdevDiags: any[]) {
         //map the hsdevDiag to a vsCodeDiag and add it to the map of grouped diagnostics
-        let addToMap = (accu: Map<string, vsrv.Diagnostic[]>, hsdevDiag: HsDevDiagnostic): Map<string, vsrv.Diagnostic[]> => {
-            let uri = UriUtils.toUri(hsdevDiag.filePath);
+        let addToMap = (accu: Map<string, vsrv.Diagnostic[]>, hsdevDiag: any): Map<string, vsrv.Diagnostic[]> => {
+            let uri = UriUtils.toUri(hsdevDiag.source.file);
             let vsCodeDiag = this.hsdevDiagToVScodeDiag(hsdevDiag);
             if (accu.has(uri)) {
                 accu.get(uri).push(vsCodeDiag);
@@ -352,14 +324,14 @@ export class HsDevService {
         });
     }
 
-    private hsdevDiagToVScodeDiag(hsdevDiag: HsDevDiagnostic): vsrv.Diagnostic {
+    private hsdevDiagToVScodeDiag(hsdevDiag: any): vsrv.Diagnostic {
         return {
-            severity: hsdevDiag.kind === HsDevDiagnosticKind.error ? vsrv.DiagnosticSeverity.Error : vsrv.DiagnosticSeverity.Warning,
+            severity: hsdevDiag.level === 2 ? vsrv.DiagnosticSeverity.Error : vsrv.DiagnosticSeverity.Warning,
             range: {
-                start: { line: hsdevDiag.line, character: hsdevDiag.col },
-                end: { line: hsdevDiag.line, character: hsdevDiag.col }
+                start: { line: hsdevDiag.region.from.line - 1, character: hsdevDiag.region.from.column - 1 },
+                end: { line: hsdevDiag.region.to.line - 1, character: hsdevDiag.region.to.column - 1 }
             },
-            message: hsdevDiag.message,
+            message: hsdevDiag.note.message,
             source: 'hs'
         };
     }

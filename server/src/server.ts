@@ -8,6 +8,7 @@ import { HsDevSettings } from './hsdevSettings';
 import { CodeActionService } from "./codeActions/codeActionService";
 import { TypeInfoKind } from './hsdev/commands/commands';
 import { CommandsService } from "./commands/commandsService";
+import { Symbol } from './hsdev/syntaxTypes';
 import * as features from "./features";
 
 // Create a connection for the server. The connection uses Node's IPC as a transport
@@ -41,11 +42,11 @@ connection.onRequest("changeTargets", (targets: string[]): Promise<string> => {
         });
 });
 
-connection.onRequest("insertTypeAbove", (documentInfo): Promise<vsrv.Hover> => {
+connection.onRequest("insertTypeAbove", (documentInfo): Promise<Symbol> => {
     const documentURI = documentInfo.textDocument.uri;
     if (UriUtils.isFileProtocol(documentURI)) {
         const textDocument = documents.get(documentURI);
-        return hsdevService.getHoverInformation(textDocument, documentInfo.position, TypeInfoKind.Generic);
+        return hsdevService.getHoveredSymbol(textDocument, documentInfo.position, TypeInfoKind.Generic);
     }
 });
 

@@ -64,7 +64,7 @@ export class HsDevServer {
     public isAlive: boolean = false;
 
     public constructor(
-        private cmd: string[] = ['hsdev'],
+        private cmd: string[],
         private options: ServerOptions = {}
     ) {}
 

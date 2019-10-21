@@ -4,7 +4,6 @@ import { ServerOptions } from './hsdev/hsdevServer';
 export interface HsDevSettings {
     clientOptions?: ClientOptions;
     serverOptions?: ServerOptions;
-    maxAutocompletionDetails: number;
     stackPath: string;
 }
 

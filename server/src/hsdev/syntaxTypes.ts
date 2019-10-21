@@ -513,6 +513,7 @@ export class Symbol extends SymbolId implements Symbol {
             case SymbolType.Method:
             case SymbolType.Selector:
             case SymbolType.Constructor:
+            case SymbolType.PatSelector:
                 return this.functionType ? `${this.name} :: ${this.functionType}` : this.name;
 
             case SymbolType.Type:
@@ -541,7 +542,6 @@ export class Symbol extends SymbolId implements Symbol {
             case SymbolType.TypeFam:
             case SymbolType.DataFam:
             case SymbolType.PatConstructor:
-            case SymbolType.PatSelector:
                 return this.name;
         }
     }

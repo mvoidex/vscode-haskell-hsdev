@@ -46,7 +46,6 @@ function df<T>(value: T, defaultValue: T): T {
 function getSettings(): HsDevSettings {
     ///get initialization settings from current workspace getConfiguration
     let hsdevSettings: HsDevSettings = {
-        maxAutocompletionDetails: df(<number>vscode.workspace.getConfiguration('hsdev').get('maxAutoCompletionDetails'), 100),
         stackPath: df(<string>vscode.workspace.getConfiguration('hsdev').get('stackPath'), 'stack')
     };
     return hsdevSettings;

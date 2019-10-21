@@ -51,10 +51,10 @@ export class DocumentUtils {
 
     private static getStartingOffset(text: string, cursorOffset: number, isValidSymbol: (string) => boolean, sticky: NoMatchAtCursorBehaviour): number {
         if (isValidSymbol(text.charAt(cursorOffset)) || sticky === NoMatchAtCursorBehaviour.LookLeft || sticky === NoMatchAtCursorBehaviour.LookBoth) {
-            let i = cursorOffset - 1;
-            for (i; i >= 0 && isValidSymbol(text.charAt(i)); i--) {
+            let i = cursorOffset;
+            for (i; i > 0 && isValidSymbol(text.charAt(i - 1)); i--) {
             }
-            return i + 1;
+            return i;
         }
         else {
             return cursorOffset;
@@ -66,7 +66,7 @@ export class DocumentUtils {
             let i = Math.max(0, cursorOffset);
             for (i; i < text.length && isValidSymbol(text.charAt(i)); i++) {
             }
-            return i - 1;
+            return i;
         }
         else {
             return cursorOffset;

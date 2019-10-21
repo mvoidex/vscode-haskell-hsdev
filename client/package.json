@@ -35,12 +35,7 @@
 				"hsdev.stackPath": {
 					"type": "string",
 					"default": "stack",
-					"description": "(Warning, can break Haskero behavior) path to the stack executable."
-				},
-				"hsdev.maxAutoCompletionDetails": {
-					"type": "number",
-					"default": 100,
-					"description": "Maximum autocompletion information requests sent to get type info/module in the autocompletion flow. Set to 0 to disable details info in autocompletion."
+					"description": "path to the stack executable."
 				}
 			}
 		}

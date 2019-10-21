@@ -1,7 +1,7 @@
 'use strict';
 
 import { Result, success, fail, defined } from '../../utils/result';
-import { Parser, SymbolId, Symbol, SymbolUsage, ModuleId, Module, parseList, PackageDb, PredefinedPackageDb, CustomPackageDb, Package, parsePackageDb } from '../syntaxTypes';
+import { Parser, SymbolId, Symbol, SymbolUsage, ModuleId, Module, parseList, PackageDb, PredefinedPackageDb, CustomPackageDb, Package, parsePackageDb, FileLocation, Region } from '../syntaxTypes';
 import { LogLevel } from '../../debug/debugUtils';
 
 
@@ -333,6 +333,60 @@ export class Complete implements HsDevCommand<Symbol[]> {
         return {prefix: this.prefix, wide: this.wide, file: this.file};
     }
     public parseResponse = parseList(Symbol.parse);
+}
+
+export enum Severity {
+    Hint,
+    Warning,
+    Error
+}
+
+export interface Note<T extends Serializable> extends Serializable {
+    note: T;
+    source: FileLocation;
+    rgn: Region;
+    sev?: Severity;
+}
+
+export interface OutputMessage extends Serializable {
+    message: string;
+    suggestion?: string;
+}
+
+export class Note<T extends Serializable> implements Note<T> {
+    public constructor(
+        public note: T,
+        public source: FileLocation,
+        public rgn: Region,
+        public sev?: Severity
+    ) {}
+    public serialize(): any {
+        return {
+            note: this.note.serialize(),
+            source: {file: this.source.filename},
+            level: Severity[this.sev].toLowerCase(),
+            region: { from: this.rgn.start, to: this.rgn.end }
+        };
+    }
+}
+
+export class CheckLint implements HsDevCommand<any[]> {
+    public command = "check-lint";
+    public constructor(
+        public files: string[],
+        public ghcOpts: string[] = [],
+        public lintOpts: string[] = [],
+        public clear: boolean = false
+    ) {}
+    public serialize(): any {
+        return {
+            files: this.files.map(f => { return {file: f}; }),
+            "ghc-opts": this.ghcOpts,
+            "lint-opts": this.lintOpts,
+            clear: this.clear
+        };
+    }
+    public parseResponse = (value: any) => success(value as any[]);
 }
 
 export class Exit implements HsDevCommand<void> {
