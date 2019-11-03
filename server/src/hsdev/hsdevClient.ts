@@ -148,6 +148,9 @@ export class HsDevClient implements Disposable {
         Log.debug(`connecting hsdev client`);
         this.sock = new net.Socket();
         this.sock.setEncoding('utf-8');
+        this.sock.on('error', err => {
+            Log.error(`socket error: ${err}`);
+        });
 
         return new Promise<void>((resolve, reject) => {
             this.sock.on('connect', () => {

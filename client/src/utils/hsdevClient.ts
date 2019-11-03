@@ -30,6 +30,7 @@ export interface HsDevSettings {
     clientOptions?: ClientOptions;
     serverOptions?: ServerOptions;
     stackPath: string;
+    hsdevPath: string;
 }
 
 export interface HsDevClientInitOptions {

@@ -57,7 +57,7 @@ export class HsDevService implements Disposable {
         Log.init(connection, LogLevel.TRACE);
         Log.info(`Initializing haskell hsdev`);
 
-        this.hsdevServer = new HsDevServer([settings.stackPath, 'exec', '--', 'hsdev'], settings.serverOptions);
+        this.hsdevServer = new HsDevServer([settings.hsdevPath], settings.serverOptions);
         this.hsdevClient = new HsDevClient(settings.clientOptions);
         this.settings = settings;
         this.connection = connection;

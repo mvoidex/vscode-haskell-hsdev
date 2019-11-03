@@ -5,6 +5,7 @@ export interface HsDevSettings {
     clientOptions?: ClientOptions;
     serverOptions?: ServerOptions;
     stackPath: string;
+    hsdevPath: string;
 }
 
 export function settingsUpdated<T>(current: T, updated: T): boolean {

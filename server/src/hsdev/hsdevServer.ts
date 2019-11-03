@@ -123,6 +123,9 @@ export class HsDevServer implements Disposable {
         this.proc.setMaxListeners(100);
         this.proc.stdout.setMaxListeners(100);
         this.proc.stderr.setMaxListeners(100);
+        this.proc.on('error', err => {
+            Log.error(`process error: ${err}`);
+        });
         this.proc.on('exit', (code, signal) => {
             Log.debug(`hsdev server exited with code: ${code}, and signal: ${signal}`);
             this.clear();

@@ -47,7 +47,8 @@ function df<T>(value: T, defaultValue: T): T {
 function getSettings(): HsDevSettings {
     ///get initialization settings from current workspace getConfiguration
     let hsdevSettings: HsDevSettings = {
-        stackPath: df(<string>vscode.workspace.getConfiguration('hsdev').get('stackPath'), 'stack')
+        stackPath: df(<string>vscode.workspace.getConfiguration('hsdev').get('stackPath'), 'stack'),
+        hsdevPath: df(<string>vscode.workspace.getConfiguration('hsdev').get('hsdevPath'), 'hsdev')
     };
     return hsdevSettings;
 }
