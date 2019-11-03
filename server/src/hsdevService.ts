@@ -39,6 +39,8 @@ const serverCapabilities: vsrv.InitializeResult = {
     }
 };
 
+const attachToServer = true;
+
 /**
  * Exposes all haskell-hsdev capabilities to the server
  */
@@ -57,15 +59,17 @@ export class HsDevService implements Disposable {
         Log.init(connection, LogLevel.TRACE);
         Log.info(`Initializing haskell hsdev`);
 
-        this.hsdevServer = new HsDevServer([settings.hsdevPath], settings.serverOptions);
+        if (!attachToServer) {
+            this.hsdevServer = new HsDevServer([settings.hsdevPath], settings.serverOptions);
+            this.hsdevServer.on('start', () => { Log.info('hsdev server started'); });
+            this.hsdevServer.on('stop', () => { Log.info('hsdev server stopped'); });
+        }
         this.hsdevClient = new HsDevClient(settings.clientOptions);
         this.settings = settings;
         this.connection = connection;
         this.features = new Features(connection);
         this.currentTargets = targets;
 
-        this.hsdevServer.on('start', () => { Log.info('hsdev server started'); });
-        this.hsdevServer.on('stop', () => { Log.info('hsdev server stopped'); });
         this.hsdevClient.on('connect', () => {
             Log.info('hsdev client connected');
             this.hsdevClient.invoke(new Link()); // force process exit on disconnect
@@ -107,7 +111,9 @@ export class HsDevService implements Disposable {
     private async startHsDev(targets: string[]): Promise<void> {
         // Launch the hsdev process
         try {
-            await this.hsdevServer.start();
+            if (!attachToServer) {
+                await this.hsdevServer.start();
+            }
             await this.hsdevClient.connect();
             return;
         } catch (reason) {
