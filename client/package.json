@@ -51,7 +51,7 @@
 		"@types/mocha": "^5.2.7",
 		"@types/node": "^12.11.1",
 		"glob": "^7.1.4",
-		"mocha": "^6.2.2",
+		"mocha": "^10.2.0",
 		"tslint": "^5.20.0",
 		"typescript": "^3.6.4",
 		"vscode-test": "^1.2.0",
